@@ -1,0 +1,12 @@
+[Unit]
+Description=Import new OBS replays into Medal
+
+[Service]
+# install.sh puts the full path to node here.
+ExecStart=@NODE@ %h/.local/bin/medal-obs-import
+# Environment=OBS_DIR=/path/to/your/obs/replays
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

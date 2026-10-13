@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Medal (tray)
+Exec=@HOME@/.local/bin/medal-tray
+X-KDE-autostart-after=panel
+X-GNOME-Autostart-enabled=true
+StartupNotify=false

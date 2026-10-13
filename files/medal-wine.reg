@@ -1,0 +1,26 @@
+Windows Registry Editor Version 5.00
+
+; Wine draws the Medal window itself, so KWin/your WM adds no title bar.
+[HKEY_CURRENT_USER\Software\Wine\AppDefaults\Medal.exe\X11 Driver]
+"Decorated"="N"
+
+; Turn off the Wine theme. The light theme draws a white window border.
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ThemeManager]
+"ThemeActive"="0"
+"DllName"=""
+
+; Dark border and edge colors, so the border matches Medal.
+[HKEY_CURRENT_USER\Control Panel\Colors]
+"ActiveBorder"="18 18 18"
+"InactiveBorder"="18 18 18"
+"WindowFrame"="18 18 18"
+"ButtonFace"="18 18 18"
+"ButtonHilight"="18 18 18"
+"ButtonLight"="18 18 18"
+"ButtonShadow"="18 18 18"
+"ButtonDkShadow"="18 18 18"
+"ButtonText"="230 230 230"
+
+; Stop Medal from starting itself (uncapped) every time the prefix boots.
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run]
+"Medal"=-

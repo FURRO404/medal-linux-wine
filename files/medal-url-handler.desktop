@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Medal (link handler)
+Exec=@HOME@/.local/bin/medal %u
+Type=Application
+NoDisplay=true
+MimeType=x-scheme-handler/medal;

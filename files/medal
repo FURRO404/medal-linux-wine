@@ -1,0 +1,21 @@
+#!/bin/sh
+# Start Medal.tv under Wine with a memory cap and the fixes that make it usable.
+#
+# - systemd scope: Medal under Wine can grow until the kernel OOM killer fires.
+#   The cap stops only Medal, not your PC.
+# - --host-resolver-rules: the Home and Library ad webviews load header-bidding
+#   iframes, and under Wine each one gets its own ~500 MB renderer (11 GB in 5 s).
+#   The ad hosts fail to resolve inside Medal only. Your browser is not affected.
+# - --disable-gpu-compositing: needed with Wine Decorated=N, or the window is black.
+# - --remote-debugging-port on 127.0.0.1: used by medal-obs-import to import clips.
+WINEPREFIX="${WINEPREFIX:-$HOME/.wine}"
+MEDAL_EXE="$WINEPREFIX/drive_c/users/$USER/AppData/Local/Medal/current/Medal.exe"
+
+ADS="doubleclick.net googlesyndication.com googleadservices.com googletagservices.com adservice.google.com pubmatic.com yellowblue.io amspbs.com adnxs.com rubiconproject.com amazon-adsystem.com criteo.com criteo.net openx.net casalemedia.com 3lift.com sharethrough.com smartadserver.com lijit.com sovrn.com adform.net media.net taboola.com outbrain.com moatads.com doubleverify.com adsafeprotected.com indexww.com teads.tv bidswitch.net"
+RULES=""
+for d in $ADS; do RULES="${RULES}MAP $d ~NOTFOUND, MAP *.$d ~NOTFOUND, "; done
+
+exec systemd-run --user --scope --unit="medal-$$" -p MemoryHigh=8G -p MemoryMax=9G -p MemorySwapMax=0 \
+  env WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all wine "$MEDAL_EXE" \
+  "--host-resolver-rules=${RULES%, }" --disable-site-isolation-trials --disable-gpu-compositing \
+  --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 "$@"
