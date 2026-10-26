@@ -10,6 +10,7 @@ import { join } from "node:path";
 const DIR = process.env.OBS_DIR ?? join(homedir(), "Videos", "OBS");
 const PORT = 9222;
 const pending = new Set();
+let flushing = false;
 
 const toWinPath = f => "Z:" + join(DIR, f).replaceAll("/", "\\");
 const log = (...a) => console.log(new Date().toTimeString().slice(0, 8), ...a);
@@ -39,7 +40,11 @@ async function importFiles(paths) {
 }
 
 async function flush() {
-  if (!pending.size) return;
+  // Multiple inotify events/timers can overlap while MedalIPC is awaiting a
+  // response. Keep only one import request in flight; otherwise the same OBS
+  // path can be handed to Medal twice before it is removed from `pending`.
+  if (flushing || !pending.size) return;
+  flushing = true;
   const paths = [...pending];
   try {
     const n = await importFiles(paths);
@@ -47,6 +52,8 @@ async function flush() {
     paths.forEach(p => pending.delete(p));
   } catch (e) {
     log(`Medal not reachable (${e.message}), ${paths.length} clip(s) wait for the next try`);
+  } finally {
+    flushing = false;
   }
 }
 
@@ -65,4 +72,56 @@ watcher.stdout.on("data", d => {
 });
 watcher.on("exit", code => { log("inotifywait exited", code); process.exit(1); });
 setInterval(flush, 30000);
+
+// Medal now serves its ads from its own domain (medal.tv/ads/...) in <webview>
+// tags, so the launcher's DNS block cannot stop them. Under Wine each ad
+// webview is a ~650 MB renderer. Point every ad webview at about:blank, now
+// and whenever Medal sets one, so the ad page never loads. The hook lives in
+// the page, so it is checked again every few seconds in case Medal reloads.
+const AD_GUARD = `(() => {
+  const isAd = v => /^https?:\\/\\/([a-z0-9-]+\\.)*medal\\.tv\\/ads\\//i.test(String(v));
+  const blank = w => { if (isAd(w.getAttribute("src"))) w.setAttribute("src", "about:blank"); };
+  let installed = false, n = 0;
+  if (!window.__medalAdGuard) {
+    window.__medalAdGuard = true;
+    const set = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (k, v) {
+      if (this.tagName === "WEBVIEW" && String(k).toLowerCase() === "src" && isAd(v)) v = "about:blank";
+      return set.call(this, k, v);
+    };
+    new MutationObserver(ms => { for (const m of ms) for (const el of m.addedNodes)
+      if (el.nodeType === 1) (el.tagName === "WEBVIEW" ? [el] : el.querySelectorAll("webview")).forEach(blank);
+    }).observe(document.documentElement, { childList: true, subtree: true });
+    installed = true;
+  }
+  document.querySelectorAll("webview").forEach(w => { if (isAd(w.getAttribute("src"))) { blank(w); n++; } });
+  return { installed, n };
+})()`;
+
+async function adGuard() {
+  try {
+    const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`, { signal: AbortSignal.timeout(5000) })).json();
+    const page = list.find(t => t.type === "page" && t.url.includes("renderer.min.html"));
+    if (!page) return;
+    const r = await new Promise((resolve, reject) => {
+      const ws = new WebSocket(page.webSocketDebuggerUrl);
+      const timer = setTimeout(() => { ws.close(); reject(new Error("timeout")); }, 5000);
+      ws.onerror = () => { clearTimeout(timer); reject(new Error("websocket error")); };
+      ws.onopen = () => ws.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: AD_GUARD, returnByValue: true } }));
+      ws.onmessage = m => {
+        const msg = JSON.parse(m.data);
+        if (msg.id !== 1) return;
+        clearTimeout(timer);
+        ws.close();
+        resolve(msg.result?.result?.value);
+      };
+    });
+    if (r?.installed) log("ad guard installed");
+    if (r?.n > 0) log(`blanked ${r.n} ad webview(s)`);
+  } catch {
+    // Medal is not running or busy; try again next time.
+  }
+}
+setInterval(adGuard, 5000);
+adGuard();
 log("watching", DIR);

@@ -39,7 +39,7 @@ OBS replay buffer ──saves──▶ ~/Videos/OBS/Replay ….mp4
 
 | Problem | Cause | Fix |
 |---|---|---|
-| PC freezes, OOM killer, Medal uses 10–20 GB | Ad webviews on Home/Library load header-bidding iframes; under Wine each is a ~500 MB renderer | Ad hosts fail to resolve inside Medal (`--host-resolver-rules`), memory cap with a systemd scope |
+| PC freezes, OOM killer, Medal uses 10–20 GB | Ad webviews on Home/Library load header-bidding iframes; under Wine each is a ~500 MB renderer | Ad hosts fail to resolve inside Medal (`--host-resolver-rules`), `medal-obs-import` points `medal.tv/ads/` webviews at `about:blank`, memory cap with a systemd scope |
 | "recorder crashed! exit code 4294930434" / crash loop | `MedalEncoder.exe` crashes in native code under Wine (also with .NET 4.8) | Turn the recorder off, record with OBS |
 | External Recorder folder sync does nothing | That sync runs inside the crashed recorder | `medal-obs-import` watcher calls Medal's own import |
 | Discord sign-in hangs on "Connecting to Discord…" | Linux does not know `medal://` links | `medal://` link handler |
@@ -134,7 +134,7 @@ journalctl --user -u medal-obs-import -f
 
 | Symptom | Check / fix |
 |---|---|
-| Medal is slow or freezes | `systemctl --user status 'medal-*'` shows memory. If it is near 8 GB, a new ad host got through. Open `http://127.0.0.1:9222/json/list` while Medal runs, find the new ad domain, and add it to `ADS` in `~/.local/bin/medal`. |
+| Medal is slow or freezes | `systemctl --user status 'medal-*'` shows memory. If it is near 8 GB, a new ad host got through. Open `http://127.0.0.1:9222/json/list` while Medal runs, find the new ad domain, and add it to `ADS` in `~/.local/bin/medal`. If the ad webview itself is on a new URL (not `medal.tv/ads/`), update `isAd` in `~/.local/bin/medal-obs-import`. |
 | Medal closed by itself | It hit the 9 GB cap: `journalctl --user | grep medal- | grep oom`. Same fix as above. |
 | Clips do not import | `journalctl --user -u medal-obs-import -n 20`. "Medal not reachable" means Medal is not running, or it was not started with `~/.local/bin/medal`. |
 | Black Medal window | The launcher must have `--disable-gpu-compositing`. |
